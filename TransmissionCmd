@@ -1,0 +1,43 @@
+#!/usr/bin/python
+
+from cmd import Cmd
+import sys
+import transmissionrpc as t
+import os
+from prettytable import PrettyTable as PT
+
+class TransmissionCMD(Cmd):
+    def __init__(s):
+        Cmd.__init__(s)
+        s.config_file = os.path.expanduser('~/.config/TransmissionCmd/config')
+        if (os.path.exists(s.config_file)):
+            """load config"""
+        else:
+            s.host="localhost"
+            s.port=9091
+            s.user='transmission'
+            s.password='transmission'
+        s.t=t.Client()
+        s.prompt = '(TransmissionCMD)'
+    def do_list(s,line):
+        """ List Download queue. """
+        x = PT(['id','Name','Size','Status','Ratio','Speed'])
+        for tor in s.t.get_torrents():
+            if tor.status=='seeding':
+                ratio=tor.percentDone
+                speed=tor.rateUpload
+            else:
+                ratio=tor.percentDone
+                speed=tor.rateDownload
+            x.add_row([tor.id,tor.name,tor.sizeWhenDone,tor.status,ratio,speed])
+        print x
+    def do_stats(s,line):
+        """ Get Statistics """
+        
+    def do_quit(s,line):
+        """ exit. """
+        sys.exit()
+
+if __name__ == '__main__':
+    tc=TransmissionCMD()
+    tc.cmdloop()
