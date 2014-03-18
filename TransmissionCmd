@@ -3,8 +3,16 @@
 from cmd import Cmd
 import sys
 import transmissionrpc as t
+from transmissionrpc.utils import make_rpc_name,argument_value_convert
 import os
 from prettytable import PrettyTable as PT
+
+def hbytes(num):
+    for x in ['bytes','KB','MB','GB']:
+        if num < 1024.0:
+            return "%3.1f%s" % (num, x)
+        num /= 1024.0
+    return "%3.1f%s" % (num, 'TB')
 
 class TransmissionCMD(Cmd):
     def __init__(s):
@@ -17,27 +25,72 @@ class TransmissionCMD(Cmd):
             s.port=9091
             s.user='transmission'
             s.password='transmission'
-        s.t=t.Client()
+        s.do_connect("%s:%d"%(s.host,s.port))
         s.prompt = '(TransmissionCMD)'
     def do_list(s,line):
         """ List Download queue. """
-        x = PT(['id','Name','Size','Status','Ratio','Speed'])
+        x = PT(['id','Name','Size','Status','Ratio','Up','Down','ETA'])
+        x.align['Name']='l'
+        up=down=0
         for tor in s.t.get_torrents():
             if tor.status=='seeding':
                 ratio=tor.percentDone
-                speed=tor.rateUpload
             else:
                 ratio=tor.percentDone
-                speed=tor.rateDownload
-            x.add_row([tor.id,tor.name,tor.sizeWhenDone,tor.status,ratio,speed])
+            x.add_row([tor.id,tor.name[0:35],hbytes(tor.sizeWhenDone),tor.status,tor.ratio,tor.rateUpload/1000,tor.rateDownload/1000,tor.format_eta()])
+            up+=tor.rateUpload
+            down+=tor.rateDownload
         print x
-    def do_stats(s,line):
-        """ Get Statistics """
-        
+        print "Upload: %dKBi/s\t Download: %dKBi/s"%(up/1000,down/1000)
+    def do_add(s,line):
+        """Usage: \nadd torrent/magnet """
+        s.t.add_torrent(line)
+    def do_stop(s,line):
+        """Usage:\nstop id """
+        if line.isdigit():
+            print "Stopping: %s."%line
+            s.t.stop_torrent(int(line))
+    def do_start(s,line):
+        """Usage:\nstart id"""
+        if line.isdigit():
+            print "Starting: %s."%line
+            s.t.start_torrent(int(line))
+    def do_start_all(s,line):
+        """Usage:\nstart_all"""
+        print "Starting ALL"
+        s.t.start_all()
+    def do_set(s,line):
+        """Usage:\nset [key] [val]"""
+        se=s.t.get_session()
+        if line=="":
+            for (k,v) in se._fields.items(): print "%s: %s"%(k,getattr(se,k))
+            return
+        kv=line.split(' ',1)
+        if len(kv)==1:
+            print "%s: %s"%(kv[0],getattr(se,kv[0]))
+            return
+        (k,value)=kv
+        argument=make_rpc_name(k)
+        (arg, val) = argument_value_convert('session-set' , argument, value, s.t.rpc_version)
+        print "setting %s = %s"%(arg,val)
+        args={}
+        args[arg] = val
+        if len(args) > 0:
+            s.t._request('session-set', args, timeout=None)
+    def do_connect(s,line):
+        """ Connect To Server """
+        print "Connectnig to: %s:%d width %s:%s"%(s.host,s.port,s.user,s.password)
+        s.t=t.Client(address=s.host, port=s.port, user=s.user, password=s.password)
+    def do_debug(s,line):
+        """ Set the DEBUG ON """
+        t.add_stdout_logger()
     def do_quit(s,line):
         """ exit. """
         sys.exit()
 
 if __name__ == '__main__':
-    tc=TransmissionCMD()
-    tc.cmdloop()
+    try:
+        tc=TransmissionCMD()
+        tc.cmdloop()
+    except KeyboardInterrupt:
+        print "BYE!"
