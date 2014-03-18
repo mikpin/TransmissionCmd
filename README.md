@@ -9,4 +9,6 @@ sudo make install
 
 depends on:
 
-python transmissionrpc
+python transmissionrpc v11
+
+https://pythonhosted.org/transmissionrpc/
