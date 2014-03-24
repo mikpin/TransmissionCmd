@@ -6,6 +6,8 @@ import transmissionrpc as t
 from transmissionrpc.utils import make_rpc_name,argument_value_convert
 import os
 from prettytable import PrettyTable as PT
+import json
+import subprocess
 
 def hbytes(num):
     for x in ['bytes','KB','MB','GB']:
@@ -17,15 +19,11 @@ def hbytes(num):
 class TransmissionCMD(Cmd):
     def __init__(s):
         Cmd.__init__(s)
-        s.config_file = os.path.expanduser('~/.config/TransmissionCmd/config')
-        if (os.path.exists(s.config_file)):
-            """load config"""
-        else:
-            s.host="localhost"
-            s.port=9091
-            s.user='transmission'
-            s.password='transmission'
-        s.do_connect("%s:%d"%(s.host,s.port))
+        s.config_file = os.path.expanduser('~/.config/TransmissionCmd/config.json')
+        s.conf={}
+        s.results=[]
+        s.do_conf('load')
+        s.do_connect("%s:%d"%(s.conf['host'],s.conf['port']))
         s.prompt = '(TransmissionCMD)'
     def do_list(s,line):
         """ List Download queue. """
@@ -67,11 +65,18 @@ class TransmissionCMD(Cmd):
             return
         kv=line.split(' ',1)
         if len(kv)==1:
-            print "%s: %s"%(kv[0],getattr(se,kv[0]))
+            try:
+                print "%s: %s"%(kv[0],getattr(se,kv[0]))
+            except:
+                print "%s does not exists"%kv[0]
             return
         (k,value)=kv
         argument=make_rpc_name(k)
-        (arg, val) = argument_value_convert('session-set' , argument, value, s.t.rpc_version)
+        try:
+            (arg, val) = argument_value_convert('session-set' , argument, value, s.t.rpc_version)
+        except:
+            print "ERROR: set %s"%line
+            return
         print "setting %s = %s"%(arg,val)
         args={}
         args[arg] = val
@@ -79,15 +84,58 @@ class TransmissionCMD(Cmd):
             s.t._request('session-set', args, timeout=None)
     def do_connect(s,line):
         """ Connect To Server """
-        print "Connectnig to: %s:%d width %s:%s"%(s.host,s.port,s.user,s.password)
-        s.t=t.Client(address=s.host, port=s.port, user=s.user, password=s.password)
+        print "Connectnig to: %s:%d width %s:%s"%(s.conf['host'],s.conf['port'],s.conf['user'],s.conf['password'])
+        s.t=t.Client(address=s.conf['host'], port=s.conf['port'], user=s.conf['user'], password=s.conf['password'])
     def do_debug(s,line):
         """ Set the DEBUG ON """
         t.add_stdout_logger()
     def do_quit(s,line):
         """ exit. """
         sys.exit()
-
+    def do_conf(s,line):
+        """Saves configuration\nconf [save/load] [set <key value>]"""
+        if line == 'load':
+            if (os.path.exists(s.config_file)):
+                print "Loading config from:%s"%s.config_file
+                f=open(s.config_file,'r')
+                s.conf=json.load(f)
+                f.close()
+                return
+            else:
+                print "%s: not exists.\nUsing defaults."%s.config_file
+                s.conf['host']="localhost"
+                s.conf['port']=9091
+                s.conf['user']='transmission'
+                s.conf['password']='transmission'
+                return
+        if line == 'save':
+            dir = os.path.dirname(s.config_file)
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            f=open(s.config_file,'w')
+            json.dump(s.conf,f)
+            f.close()
+            return
+    def do_results(s,line):
+        """Print search results"""
+        x=PT(['id','Name','size','date'])
+        x.align['Name']='l'
+        id=1
+        for r in s.results:
+            x.add_row([id,r['title'][0:50],r['size'],r['date']])
+            id+=1
+        print x
+        print "Total results: %d"%len(s.results)
+    def do_download(s,line):
+        """Download result\ndownload <id>"""
+        if line.isdigit() and int(line)<len(s.results):
+            n=int(line) - 1
+            s.do_add(s.results[int(line)-1]['link'])
+            return
+        print "Error wrong id."
+    def do_search(s,line):
+        """Search Torrents"""
+        s.results = json.loads(subprocess.check_output("h33tScrap -j %s"%line,shell=True))
 if __name__ == '__main__':
     try:
         tc=TransmissionCMD()
