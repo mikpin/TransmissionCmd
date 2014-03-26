@@ -8,6 +8,44 @@ import os
 from prettytable import PrettyTable as PT
 import json
 import subprocess
+import urllib2
+import urllib
+import pprint
+
+def fenopy(keyword,limit=100,sort='size',format='json',category=3):
+    """
+   Base URL: http://fenopy.se/module/search/api.php
+   Required. The base URL for a data feed request.
+   keyword: keyword=openoffice
+   Required. The keyword that being searched on our database.
+   limit: limit=25
+   Optional. Limit number of returened results. max: 100 - min: 1 - default: 50
+   sort: sort=size
+   Optional. Indicates the sorting order and direction for the returned data. values: size, peer, relevancy - default: relevancy
+   format: format=json
+   Optional. Indicates the format of returned results. values: xml, json - default: xml
+   category: category=1
+   Optional. Limit search to defined category.
+   values:
+   0 (all)
+   1 (music)
+   2 (video)
+   3 (movies)
+   4 (games)
+   5 (anime)
+   6 (applications)
+   7 (books)
+   78 (tv shows)
+   default: 0
+   sample: http://fenopy.se/module/search/api.php?keyword=openoffice&sort=peer&format=json&limit=60&category=6
+   Search our database for `openoffice` and returns 60 results ordered by number of peers in json format.
+   XML output format
+   sample xml output
+    """
+    keyword=urllib.quote_plus(keyword)
+    url = "http://fenopy.se/module/search/api.php?keyword=%s&sort=%s&format=%s&limit=%d&category=%d"%(keyword,sort,format,limit,category)
+    r=urllib2.urlopen(url)
+    return json.loads(r.read())
 
 def hbytes(num):
     for x in ['bytes','KB','MB','GB']:
@@ -22,7 +60,7 @@ class TransmissionCMD(Cmd):
         s.config_file = os.path.expanduser('~/.config/TransmissionCmd/config.json')
         s.conf={}
         s.results=[]
-        s.do_conf('load')
+        s.do_config('load')
         s.do_connect("%s:%d"%(s.conf['host'],s.conf['port']))
         s.prompt = '(TransmissionCMD)'
     def do_list(s,line):
@@ -57,11 +95,11 @@ class TransmissionCMD(Cmd):
         """Usage:\nstart_all"""
         print "Starting ALL"
         s.t.start_all()
-    def do_set(s,line):
+    def do_set_session(s,line):
         """Usage:\nset [key] [val]"""
         se=s.t.get_session()
         if line=="":
-            for (k,v) in se._fields.items(): print "%s: %s"%(k,getattr(se,k))
+            for (k,v) in sorted(se._fields.items()): print "%s: %s"%(k,getattr(se,k))
             return
         kv=line.split(' ',1)
         if len(kv)==1:
@@ -92,7 +130,7 @@ class TransmissionCMD(Cmd):
     def do_quit(s,line):
         """ exit. """
         sys.exit()
-    def do_conf(s,line):
+    def do_config(s,line):
         """Saves configuration\nconf [save/load] [set <key value>]"""
         if line == 'load':
             if (os.path.exists(s.config_file)):
@@ -116,13 +154,25 @@ class TransmissionCMD(Cmd):
             json.dump(s.conf,f)
             f.close()
             return
+        if line.startswith('set'):
+            argv=line.split(' ')
+            if len(argv)!=3:
+                print "Error:\nExample: set user transmission"
+                return
+            if not argv[1] in ['host','port','user','password']:
+                print "Error:\n%s not in ['host','port','user','password']"%argv[1]
+                return
+            s.conf[argv[1]]=argv[2]
+            print "Set %s = %s\nremeber to save and/or connect"%(argv[1],argv[2])
+            return
+        pprint.pprint(s.conf)
     def do_results(s,line):
         """Print search results"""
-        x=PT(['id','Name','size','date'])
+        x=PT(['id','Name','size','seeders','leechers'])
         x.align['Name']='l'
         id=1
         for r in s.results:
-            x.add_row([id,r['title'][0:50],r['size'],r['date']])
+            x.add_row([id,r['name'][0:50],hbytes(r['size']),r['seeder'],r['leecher']])
             id+=1
         print x
         print "Total results: %d"%len(s.results)
@@ -130,15 +180,20 @@ class TransmissionCMD(Cmd):
         """Download result\ndownload <id>"""
         if line.isdigit() and int(line)<len(s.results):
             n=int(line) - 1
-            s.do_add(s.results[int(line)-1]['link'])
+            s.do_add(s.results[int(line)-1]['magnet'])
             return
         print "Error wrong id."
     def do_search(s,line):
-        """Search Torrents"""
-        s.results = json.loads(subprocess.check_output("h33tScrap -j %s"%line,shell=True))
+        """Search Torrents on fenopy.se"""
+        print "Powered by Fenopy api."
+        s.results=fenopy(line)
+        print "Total results: %d"%len(s.results)
+    def do_move(s,line):
+        """Move torrent id to path.\nmove 12 /mnt/storage"""
+        s.t.get_torent()
 if __name__ == '__main__':
     try:
         tc=TransmissionCMD()
         tc.cmdloop()
     except KeyboardInterrupt:
-        print "BYE!"
+        print "\nBYE!"
