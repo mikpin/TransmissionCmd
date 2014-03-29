@@ -11,6 +11,8 @@ import subprocess
 import urllib2
 import urllib
 import pprint
+import datetime
+import getopt
 
 def fenopy(keyword,limit=100,sort='size',format='json',category=3):
     """
@@ -44,8 +46,13 @@ def fenopy(keyword,limit=100,sort='size',format='json',category=3):
     """
     keyword=urllib.quote_plus(keyword)
     url = "http://fenopy.se/module/search/api.php?keyword=%s&sort=%s&format=%s&limit=%d&category=%d"%(keyword,sort,format,limit,category)
-    r=urllib2.urlopen(url)
-    return json.loads(r.read())
+    print url
+    try:
+        r=urllib2.urlopen(url)
+        return json.loads(r.read())
+    except URLError as e:
+        print e.reason
+        return []
 
 def hbytes(num):
     for x in ['bytes','KB','MB','GB']:
@@ -64,7 +71,7 @@ class TransmissionCMD(Cmd):
         s.do_connect("%s:%d"%(s.conf['host'],s.conf['port']))
         s.prompt = '(TransmissionCMD)'
     def do_list(s,line):
-        """ List Download queue. """
+        """List Download queue.\nExample:\nlist"""
         x = PT(['id','Name','Size','Status','Ratio','Up','Down','ETA'])
         x.align['Name']='l'
         up=down=0
@@ -79,24 +86,24 @@ class TransmissionCMD(Cmd):
         print x
         print "Upload: %dKBi/s\t Download: %dKBi/s"%(up/1000,down/1000)
     def do_add(s,line):
-        """Usage: \nadd torrent/magnet """
+        """Adds Torrent/Magnet/Link\nExample:\nadd torrent/magnet """
         s.t.add_torrent(line)
     def do_stop(s,line):
-        """Usage:\nstop id """
+        """Stops Torrent\nExample:\nstop id """
         if line.isdigit():
             print "Stopping: %s."%line
             s.t.stop_torrent(int(line))
     def do_start(s,line):
-        """Usage:\nstart id"""
+        """Starts Torrent\nExample:\nstart id"""
         if line.isdigit():
             print "Starting: %s."%line
             s.t.start_torrent(int(line))
     def do_start_all(s,line):
-        """Usage:\nstart_all"""
+        """Starts alla torrents\nExample:\nstart_all"""
         print "Starting ALL"
         s.t.start_all()
     def do_set_session(s,line):
-        """Usage:\nset [key] [val]"""
+        """Sets and lists session valuses\nExample:\nset [key] [val]\nset (returns a complete list)\nset keyword (return single keyword)\nset keyword value"""
         se=s.t.get_session()
         if line=="":
             for (k,v) in sorted(se._fields.items()): print "%s: %s"%(k,getattr(se,k))
@@ -121,17 +128,17 @@ class TransmissionCMD(Cmd):
         if len(args) > 0:
             s.t._request('session-set', args, timeout=None)
     def do_connect(s,line):
-        """ Connect To Server """
+        """Connect To Server\nExample:\nconnect"""
         print "Connectnig to: %s:%d width %s:%s"%(s.conf['host'],s.conf['port'],s.conf['user'],s.conf['password'])
         s.t=t.Client(address=s.conf['host'], port=s.conf['port'], user=s.conf['user'], password=s.conf['password'])
     def do_debug(s,line):
-        """ Set the DEBUG ON """
+        """Set the DEBUG ON (transmissionrpc lib)\nExample:\ndebug"""
         t.add_stdout_logger()
     def do_quit(s,line):
-        """ exit. """
+        """exit."""
         sys.exit()
     def do_config(s,line):
-        """Saves configuration\nconf [save/load] [set <key value>]"""
+        """Saves configuration\nconf [save/load] [set <key value>]\nconfig set user transmission\nconfig load\nset (lists current config)"""
         if line == 'load':
             if (os.path.exists(s.config_file)):
                 print "Loading config from:%s"%s.config_file
@@ -167,7 +174,7 @@ class TransmissionCMD(Cmd):
             return
         pprint.pprint(s.conf)
     def do_results(s,line):
-        """Print search results"""
+        """Print search results\nExample:\nresults"""
         x=PT(['id','Name','size','seeders','leechers'])
         x.align['Name']='l'
         id=1
@@ -177,21 +184,75 @@ class TransmissionCMD(Cmd):
         print x
         print "Total results: %d"%len(s.results)
     def do_download(s,line):
-        """Download result\ndownload <id>"""
+        """Download result\nExample:\ndownload <id>"""
         if line.isdigit() and int(line)<len(s.results):
             n=int(line) - 1
             s.do_add(s.results[int(line)-1]['magnet'])
+            print "Downloading %s: %s"%(line,s.results[int(line)-1]['name'])
             return
         print "Error wrong id."
     def do_search(s,line):
-        """Search Torrents on fenopy.se"""
+        """Search Torrents on fenopy.se\nExample:\nsearch ubuntu\nsearch --category/-c 3 rambo"""
         print "Powered by Fenopy api."
-        s.results=fenopy(line)
+        category=3
+        try:
+            opts,args = getopt.getopt(line.split(),"hc:",["help","category="])
+        except getopt.GetoptError:
+            print "Syntax Error"
+        for opt, arg in opts:
+            if opt in ('-c','--category'):
+                category = int(arg)
+        s.results=fenopy(' '.join(args),category=category)
         print "Total results: %d"%len(s.results)
     def do_move(s,line):
-        """Move torrent id to path.\nmove 12 /mnt/storage"""
-        s.t.get_torent()
+        """Move torrent id to path.\nExample:\nmove 12 /mnt/storage"""
+        (id,location)=line.split(' ',1)
+        s.t.move_torrent_data(id,location)
+    def do_move_older(s,line):
+        """Move downloaded Torrents to dir and remove from list\nExample: move_older /storage/Older 14\ndefault 7 days"""
+        l=line.split(' ',1)
+        if len(l)==2 and l[1].isdigit():
+            days=int(l[1])
+        else:
+            days=7
+        dir=l[0]
+        if not dir.startswith('/'):
+            return
+        print "moving torrent older than %d to %s."%(days,dir)
+        for tor in s.t.get_torrents():
+            if tor.status != "downloading" and (datetime.datetime.now()-tor.date_done).days>days:
+                print (tor.name,(datetime.datetime.now()-tor.date_done).days)
+                s.t.move_torrent_data(tor.id,dir)
+                s.t.remove_torrent(tor.id)
+    def do_remove(s,line):
+        """Remove torrent from queue [and delete data].\nExample:\nremove 5\nremove 5 DELETE"""
+        id=line.split()
+        deletedata = False
+        if len(id)==2 and id[1]=='DELETE':
+            deletadata= True
+        if id[0].isdigit:
+            s.t.remove_torrent(id[0],deleta_data=deletedata)
+    def do_help_long(s,line):
+        """Print long helo."""
+        print_help()
+
+def print_help():
+    print "TransmissionRPC Manual"
+    print "**********************\n"
+    for ent in sorted(dir(TransmissionCMD)):
+        if ent.startswith('do_'):
+            print 'Command: '+ent[3:]
+            print getattr(TransmissionCMD,ent).__doc__ + '\n'
+    print "Search Options:"
+    print fenopy.__doc__
 if __name__ == '__main__':
+    if len(sys.argv)>1:
+        if sys.argv[1]=='help_long':
+            print_help()
+            quit()
+        tc=TransmissionCMD()
+        tc.onecmd(' '.join(sys.argv[1:]))
+        quit()
     try:
         tc=TransmissionCMD()
         tc.cmdloop()

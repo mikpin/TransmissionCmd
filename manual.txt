@@ -1,0 +1,124 @@
+TransmissionRPC Manual
+**********************
+
+Command: add
+Adds Torrent/Magnet/Link
+Example:
+add torrent/magnet 
+
+Command: config
+Saves configuration
+conf [save/load] [set <key value>]
+config set user transmission
+config load
+set (lists current config)
+
+Command: connect
+Connect To Server
+Example:
+connect
+
+Command: debug
+Set the DEBUG ON (transmissionrpc lib)
+Example:
+debug
+
+Command: download
+Download result
+Example:
+download <id>
+
+Command: help
+List available commands with "help" or detailed help with "help cmd".
+
+Command: help_long
+Print long helo.
+
+Command: list
+List Download queue.
+Example:
+list
+
+Command: move
+Move torrent id to path.
+Example:
+move 12 /mnt/storage
+
+Command: move_older
+Move downloaded Torrents to dir and remove from list
+Example: move_older /storage/Older 14
+default 7 days
+
+Command: quit
+exit.
+
+Command: remove
+Remove torrent from queue [and delete data].
+Example:
+remove 5
+remove 5 DELETE
+
+Command: results
+Print search results
+Example:
+results
+
+Command: search
+Search Torrents on fenopy.se
+Example:
+search ubuntu
+search --category/-c 3 rambo
+
+Command: set_session
+Sets and lists session valuses
+Example:
+set [key] [val]
+set (returns a complete list)
+set keyword (return single keyword)
+set keyword value
+
+Command: start
+Starts Torrent
+Example:
+start id
+
+Command: start_all
+Starts alla torrents
+Example:
+start_all
+
+Command: stop
+Stops Torrent
+Example:
+stop id 
+
+Search Options:
+
+   Base URL: http://fenopy.se/module/search/api.php
+   Required. The base URL for a data feed request.
+   keyword: keyword=openoffice
+   Required. The keyword that being searched on our database.
+   limit: limit=25
+   Optional. Limit number of returened results. max: 100 - min: 1 - default: 50
+   sort: sort=size
+   Optional. Indicates the sorting order and direction for the returned data. values: size, peer, relevancy - default: relevancy
+   format: format=json
+   Optional. Indicates the format of returned results. values: xml, json - default: xml
+   category: category=1
+   Optional. Limit search to defined category.
+   values:
+   0 (all)
+   1 (music)
+   2 (video)
+   3 (movies)
+   4 (games)
+   5 (anime)
+   6 (applications)
+   7 (books)
+   78 (tv shows)
+   default: 0
+   sample: http://fenopy.se/module/search/api.php?keyword=openoffice&sort=peer&format=json&limit=60&category=6
+   Search our database for `openoffice` and returns 60 results ordered by number of peers in json format.
+   XML output format
+   sample xml output
+    
