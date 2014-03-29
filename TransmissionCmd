@@ -185,7 +185,7 @@ class TransmissionCMD(Cmd):
         print "Total results: %d"%len(s.results)
     def do_download(s,line):
         """Download result\nExample:\ndownload <id>"""
-        if line.isdigit() and int(line)<len(s.results):
+        if line.isdigit() and int(line)<=len(s.results):
             n=int(line) - 1
             s.do_add(s.results[int(line)-1]['magnet'])
             print "Downloading %s: %s"%(line,s.results[int(line)-1]['name'])
