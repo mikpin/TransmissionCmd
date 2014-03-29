@@ -187,7 +187,7 @@ class TransmissionCMD(Cmd):
         """Download result\nExample:\ndownload <id>"""
         if line.isdigit() and int(line)<=len(s.results):
             n=int(line) - 1
-            s.do_add(s.results[int(line)-1]['magnet'])
+            s.do_add(s.results[int(line)-1]['torrent'])
             print "Downloading %s: %s"%(line,s.results[int(line)-1]['name'])
             return
         print "Error wrong id."
@@ -231,7 +231,7 @@ class TransmissionCMD(Cmd):
         if len(id)==2 and id[1]=='DELETE':
             deletadata= True
         if id[0].isdigit:
-            s.t.remove_torrent(id[0],deleta_data=deletedata)
+            s.t.remove_torrent(id[0],delete_data=deletedata)
     def do_help_long(s,line):
         """Print long helo."""
         print_help()
