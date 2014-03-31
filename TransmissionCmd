@@ -129,8 +129,13 @@ class TransmissionCMD(Cmd):
             s.t._request('session-set', args, timeout=None)
     def do_connect(s,line):
         """Connect To Server\nExample:\nconnect"""
-        print "Connectnig to: %s:%d width %s:%s"%(s.conf['host'],s.conf['port'],s.conf['user'],s.conf['password'])
-        s.t=t.Client(address=s.conf['host'], port=s.conf['port'], user=s.conf['user'], password=s.conf['password'])
+        print "Connectnig to: %s:%d width %s:%s"%(s.conf['host'],int(s.conf['port']),s.conf['user'],s.conf['password'])
+        try:
+            s.t=t.Client(address=s.conf['host'], port=int(s.conf['port']), user=s.conf['user'], password=s.conf['password'])
+        except:
+            print "Connection ERROR!\ncheck your configuration."
+            return
+        print "Connected!"
     def do_debug(s,line):
         """Set the DEBUG ON (transmissionrpc lib)\nExample:\ndebug"""
         t.add_stdout_logger()
