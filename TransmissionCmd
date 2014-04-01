@@ -225,7 +225,7 @@ class TransmissionCMD(Cmd):
             return
         print "moving torrent older than %d to %s."%(days,dir)
         for tor in s.t.get_torrents():
-            if tor.status != "downloading" and (datetime.datetime.now()-tor.date_done).days>days:
+            if tor.status == "seeding" and (datetime.datetime.now()-tor.date_done).days>days:
                 print (tor.name,(datetime.datetime.now()-tor.date_done).days)
                 s.t.move_torrent_data(tor.id,dir)
                 s.t.remove_torrent(tor.id)
