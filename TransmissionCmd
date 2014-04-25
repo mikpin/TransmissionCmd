@@ -49,10 +49,10 @@ def fenopy(keyword,limit=100,sort='size',format='json',category=3):
     print url
     try:
         r=urllib2.urlopen(url)
-        return json.loads(r.read())
+        return json.load(r)
     except URLError as e:
         print e.reason
-        return []
+        return json.dumps([])
 
 def hbytes(num):
     for x in ['bytes','KB','MB','GB']:
@@ -65,6 +65,7 @@ class TransmissionCMD(Cmd):
     def __init__(s):
         Cmd.__init__(s)
         s.config_file = os.path.expanduser('~/.config/TransmissionCmd/config.json')
+        s.results_file = os.path.expanduser('~/.config/TransmissionCmd/results.json')
         s.conf={}
         s.results=[]
         s.do_config('load')
@@ -183,6 +184,9 @@ class TransmissionCMD(Cmd):
         x=PT(['id','Name','size','seeders','leechers'])
         x.align['Name']='l'
         id=1
+        f=open(s.results_file,'r')
+        s.results = json.load(f)
+        f.close()
         for r in s.results:
             x.add_row([id,r['name'][0:50],hbytes(r['size']),r['seeder'],r['leecher']])
             id+=1
@@ -208,6 +212,9 @@ class TransmissionCMD(Cmd):
             if opt in ('-c','--category'):
                 category = int(arg)
         s.results=fenopy(' '.join(args),category=category)
+        f=open(s.results_file,'w')
+        json.dump(s.results,f)
+        f.close()
         print "Total results: %d"%len(s.results)
     def do_move(s,line):
         """Move torrent id to path.\nExample:\nmove 12 /mnt/storage"""
